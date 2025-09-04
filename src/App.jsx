@@ -6,7 +6,16 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import { Toaster } from 'react-hot-toast'
 
-import Dashboard from './pages/home'
+// import EmployeeRecordPage from './pages/admin/employeeRecord'
+// import ApprovalSystemPage from './pages/admin/approvalSystem'
+import LoginPage from './pages/auth/login'
+// import Home from './pages/home'
+import SignUpPage from './pages/auth/signup'
+import UserDashboard from './pages/user/userDashboard'
+import AttendancePage from './pages/user/attendance'
+import LeavePage from './pages/user/leavePage'
+import EmployeeApprovalPage from './pages/hr/employeeApproval'
+import AttendanceAdminPage from './pages/hr/attendancePage'
 
 
 function App() {
@@ -17,7 +26,15 @@ function App() {
     <BrowserRouter>
 
     <Routes>
-      <Route path='/' element={<Dashboard/>}/>
+       <Route path='/signup' element={<SignUpPage/>}/>
+      <Route path='/login' element={<LoginPage/>}/> 
+      <Route path='/dashboard' element={<UserDashboard/>}/>
+      <Route path='/employee/attendance' element={<AttendancePage/>}/>
+       <Route path='/employee/leave-requests' element={<LeavePage/>}/>
+
+   {/* HR Routes*/}
+    <Route path='/hr/employee-approval' element={<EmployeeApprovalPage/>}/>   
+    <Route path='hr/attendance' element={<AttendanceAdminPage/>}/>
 
     </Routes>
     <Toaster/>
