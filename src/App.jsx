@@ -16,6 +16,11 @@ import AttendancePage from './pages/user/attendance'
 import LeavePage from './pages/user/leavePage'
 import EmployeeApprovalPage from './pages/hr/employeeApproval'
 import AttendanceAdminPage from './pages/hr/attendancePage'
+import LeaveAdminPage from './pages/hr/leavePage'
+import TaskAdmin from './pages/hr/task'
+import EmployeeAttendance from './pages/employeeAttendance'
+import EmployeeAttendancePage from './pages/employeeAttendance'
+
 
 
 function App() {
@@ -35,6 +40,9 @@ function App() {
    {/* HR Routes*/}
     <Route path='/hr/employee-approval' element={<EmployeeApprovalPage/>}/>   
     <Route path='hr/attendance' element={<AttendanceAdminPage/>}/>
+     <Route path='hr/attendance/:empId' element={<EmployeeAttendancePage/>}/>
+    <Route path='/hr/leave-requests' element={<LeaveAdminPage/>}/>
+    <Route path='/hr/tasks' element={<TaskAdmin/>}/>
 
     </Routes>
     <Toaster/>

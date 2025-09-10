@@ -13,9 +13,9 @@ const Login = () => {
   const handleSubmit = async(e) => {
     e.preventDefault();
     try {
-    const { data } = await axios.post("/api/users/login", {email,password},{withCredentials:true});
+    const { data } = await axios.post("/api/users/login", {email,password});
     console.log("Login attempt:", { email, password });
-    setUser(data.user)
+    setUser(data.employee)
     setAccessToken(data.token)
     toast.success("Login successfully....")
     navigate("/dashboard")

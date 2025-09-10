@@ -8,10 +8,11 @@ const Attendance = () => {
   const [status, setStatus] = useState("Not clocked in");
   const [isClockedIn, setIsClockedIn] = useState(false);
   const [stats, setStats] = useState({
+    present: 0,
+    late: 0,
+    halfDay: 0,
+    absent: 0,
     attendanceRate: 0,
-    presentDays: 0,
-    lateDays: 0,
-    absentDays: 0,
   });
   const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,96 +24,95 @@ const Attendance = () => {
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [year, setYear] = useState(today.getFullYear());
 
-  // ✅ Fetch attendance stats + recent records
+  // ✅ Fetch All Attendance Records
   useEffect(() => {
     const fetchAttendance = async () => {
       try {
         setLoading(true);
-        const [statsRes, recentRes] = await Promise.all([
-          axios.post(`/api/attendance/stats/${user._id}`, { month, year }),
-          axios.post(`/api/attendance/recent/${user._id}`, { month, year }),
-        ]);
+        const res = await axios.get(`/api/attendance/${user.id}`);
+        const allRecords = res?.data?.data || [];
 
-        setStats(statsRes.data?.data || {});
-        setRecent(recentRes?.data?.data || []);
+        // ✅ Filter by selected month & year
+        const filtered = allRecords.filter((rec) => {
+          const d = new Date(rec.date);
+          return d.getMonth() + 1 === month && d.getFullYear() === year;
+        });
 
-        console.log(recentRes.data.data);
-        
-        // ✅ Check today's attendance
+        setRecent(filtered);
+
+        // ✅ Calculate Stats
+        const present = filtered.filter((r) => r.status === "present").length;
+        const late = filtered.filter((r) => r.status === "late").length;
+        const halfDay = filtered.filter((r) => r.status === "half-day").length;
+        const absent = filtered.filter((r) => r.status === "absent").length;
+
+        const totalDays = present + late + halfDay + absent;
+        const attendanceRate =
+          totalDays > 0 ? ((present + late + halfDay) / totalDays) * 100 : 0;
+
+        setStats({ present, late, halfDay, absent, attendanceRate });
+
+        // ✅ Today’s Attendance
         const todayDate = new Date().toISOString().split("T")[0];
-        const todayRecord = recentRes?.data?.data?.find(
+        const todayRecord = filtered.find(
           (r) => new Date(r.date).toISOString().split("T")[0] === todayDate
         );
 
         if (todayRecord) {
-            console.log(todayRecord);
-            
           setStatus(todayRecord.status);
-          setIsClockedIn(todayRecord.status === "Clocked in");
+          setIsClockedIn(!todayRecord.checkOut); // still clocked in if no checkout
         } else {
           setStatus("Not clocked in");
           setIsClockedIn(false);
         }
       } catch (err) {
         console.error("Error fetching attendance", err);
-        toast.error(err?.response?.data?.message || err?.message || "Something went wrong");
+        toast.error(
+          err?.response?.data?.message || err?.message || "Something went wrong"
+        );
       } finally {
         setLoading(false);
       }
     };
 
-    if (user?._id) fetchAttendance();
+    if (user?.id) fetchAttendance();
   }, [user, month, year]);
 
-  // ✅ Clock In/Out Handler
+  // ✅ Clock In/Out
   const handleClock = async () => {
     try {
       let res;
 
       if (isClockedIn) {
-        res = await axios.post(`/api/attendance/checkout/${user._id}`, { userId: user._id });
+        res = await axios.post(`/api/attendance/checkout/${user.id}`, {
+          userId: user.id,
+        });
         setIsClockedIn(false);
       } else {
-        res = await axios.post(`/api/attendance/checkin/${user._id}`, { userId: user._id });
+        res = await axios.post(`/api/attendance/checkin/${user.id}`, {
+          userId: user.id,
+        });
         setIsClockedIn(true);
       }
 
       setStatus(res.data?.attendance?.status || "Not clocked in");
-
-      // Refresh stats + recent
-      const [statsRes, recentRes] = await Promise.all([
-        axios.post(`/api/attendance/stats/${user._id}`, { month, year }),
-        axios.post(`/api/attendance/recent/${user._id}`, { month, year }),
-      ]);
-      setStats(statsRes.data?.data || {});
-      console.log(stats);
-      
-      setRecent(recentRes?.data?.data || []);
     } catch (err) {
       console.error("Clock In/Out failed", err);
-      toast.error(err?.response?.data?.message || err?.message || "Something went wrong");
+      toast.error(
+        err?.response?.data?.message || err?.message || "Something went wrong"
+      );
     }
   };
 
-  if (loading) {
-    return <p className="text-center text-gray-500">Loading attendance...</p>;
-  }
-
-  // ✅ Generate month/year dropdown options
+  // ✅ Month/Year Options
   const months = [
     "January","February","March","April","May","June",
-    "July","August","September","October","November","December"
+    "July","August","September","October","November","December",
   ];
   const years = Array.from({ length: 6 }, (_, i) => today.getFullYear() - 2 + i);
 
   return (
     <div className="p-6 space-y-6">
-      {/* Page Header */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-semibold">My Attendance</h2>
-        <p className="text-gray-500 text-sm">{today.toDateString()}</p>
-      </div>
-      <p className="text-gray-600">Track your daily attendance and view history</p>
 
       {/* Clock In/Out */}
       <div className="bg-white p-6 rounded-2xl shadow-sm flex items-center justify-between">
@@ -122,7 +122,11 @@ const Attendance = () => {
             Clock In/Out
           </h3>
           <p className="text-sm text-gray-500">Current Status</p>
-          <p className={`font-medium ${isClockedIn ? "text-green-600" : "text-red-500"}`}>
+          <p
+            className={`font-medium ${
+              isClockedIn ? "text-green-600" : "text-red-500"
+            }`}
+          >
             {status}
           </p>
         </div>
@@ -138,39 +142,41 @@ const Attendance = () => {
         </button>
       </div>
 
-      {/* Attendance Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white p-4 rounded-xl shadow-sm">
           <p className="text-sm text-gray-500">Attendance Rate</p>
           <p className="text-xl font-semibold text-green-600">
-            {stats.attendanceRate || 0}%
+            {stats.attendanceRate.toFixed(1)}%
           </p>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm">
           <p className="text-sm text-gray-500">Present Days</p>
-          <p className="text-xl font-semibold">{stats.presentDays+stats.lateDays || 0}</p>
+          <p className="text-xl font-semibold">{stats.present}</p>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm">
           <p className="text-sm text-gray-500">Late Days</p>
-          <p className="text-xl font-semibold text-yellow-600">{stats.lateDays || 0}</p>
+          <p className="text-xl font-semibold text-yellow-600">{stats.late}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm">
+          <p className="text-sm text-gray-500">Half-Days</p>
+          <p className="text-xl font-semibold text-blue-600">{stats.halfDay}</p>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm">
           <p className="text-sm text-gray-500">Absent Days</p>
-          <p className="text-xl font-semibold text-red-600">{stats.absentDays || 0}</p>
+          <p className="text-xl font-semibold text-red-600">{stats.absent}</p>
         </div>
       </div>
 
-      {/* Calendar + Recent Attendance */}
+      {/* Calendar + Recent */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Calendar */}
+        {/* Calendar Filter */}
         <div className="bg-white p-6 rounded-2xl shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-semibold flex items-center gap-2">
               <Calendar className="w-5 h-5 text-gray-500" />
               Calendar View
             </h3>
-
-            {/* Month & Year Selectors */}
             <div className="flex gap-2">
               <select
                 value={month}
@@ -196,17 +202,18 @@ const Attendance = () => {
               </select>
             </div>
           </div>
-
           <p className="text-sm text-gray-500">
             {months[month - 1]} {year}
           </p>
-
           <div className="mt-4 flex gap-4 text-sm">
             <span className="flex items-center gap-1">
               <span className="w-3 h-3 rounded-full bg-green-500"></span> Present
             </span>
             <span className="flex items-center gap-1">
               <span className="w-3 h-3 rounded-full bg-yellow-500"></span> Late
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-3 h-3 rounded-full bg-blue-500"></span> Half-Day
             </span>
             <span className="flex items-center gap-1">
               <span className="w-3 h-3 rounded-full bg-red-500"></span> Absent
@@ -228,6 +235,8 @@ const Attendance = () => {
                         ? "text-green-600"
                         : day.status === "late"
                         ? "text-yellow-600"
+                        : day.status === "half-day"
+                        ? "text-blue-600"
                         : "text-red-600"
                     }`}
                   >

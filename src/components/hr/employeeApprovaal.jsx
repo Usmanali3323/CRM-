@@ -15,10 +15,10 @@ function EmployeeApproval() {
     async function employees() {
       try {
         const res = await axios.get("/api/users");
-        if (!res?.data?.success) {
+        if (!res?.data) {
           toast.error("Error Fetching Users Records");
         }
-        setUsers(res?.data?.users || []);
+        setUsers(res?.data || []);
         setFilteredUsers(res?.data?.users || []);
       } catch (error) {
         toast.error(error?.response?.data?.message || error?.message);

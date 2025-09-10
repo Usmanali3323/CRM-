@@ -1,129 +1,133 @@
-import toast from "react-hot-toast";
-import axios from "../../util/axiosInstance";
 import React, { useEffect, useState } from "react";
+import axios from "../../util/axiosInstance";
+import toast from "react-hot-toast";
+
 import { TbGraph } from "react-icons/tb";
 import { FaUserTimes, FaUserCheck, FaUserClock } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+
+// ✅ Utility to format date (yyyy-mm-dd)
+const formatDate = (date = new Date()) =>
+  [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+
+// ✅ Stat Card Component
+const StatCard = ({ icon: Icon, color, label, value }) => (
+  <li
+    className={`p-6 ${color.bg} rounded-xl shadow flex flex-col items-center justify-center`}
+  >
+    <Icon className={`${color.icon} text-3xl mb-2`} />
+    <p className={`text-lg font-semibold ${color.text}`}>{value}</p>
+    <p className="text-sm text-gray-600">{label}</p>
+  </li>
+);
 
 function Attendance() {
-  const [records, setRecords] = useState({
-    total: 0,
-    present: 0,
-    late: 0,
-    absent: 0,
-  });
+  const [records, setRecords] = useState({});
   const [employees, setEmployees] = useState([]);
   const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [search, setSearch] = useState("");
-  const [department, setDepartment] = useState("");
+  const navigate = useNavigate();
 
+  // ✅ Fetch attendance summary & employees
   useEffect(() => {
-    async function fetchRecordstate() {
+    const loadData = async () => {
       try {
-        const res = await axios.get("/api/admin/attendance/state");
-        if (res?.data?.success) {
-          setRecords(res?.data?.stats);
-        }
-      } catch (error) {
-        toast.error(error?.response?.data?.message || error?.message);
-      }
-    }
+        const today = formatDate();
 
-    async function fetchEmployees() {
-      try {
-        const res = await axios.get("/api/admin/attendance/employees");
-        if (res?.data?.success) {
-          setEmployees(res?.data?.employees || []);
-          setFilteredEmployees(res?.data?.employees || []);
-        }
-      } catch (error) {
-        toast.error(error?.response?.data?.message || error?.message);
-      }
-    }
+        const [summaryRes, employeesRes] = await Promise.all([
+          axios.get(`/api/attendance/summary/daily?date=${today}`),
+          axios.get("/api/attendance/getAttendance"),
+        ]);
 
-    fetchRecordstate();
-    fetchEmployees();
+        // filter employees for today
+        const employeesToday =
+          employeesRes.data?.data?.filter((record) => {
+            const recordDate = formatDate(new Date(record.date));
+            return recordDate === today;
+          }) || [];
+
+        setEmployees(employeesToday);
+        setFilteredEmployees(employeesToday);
+
+        setRecords(summaryRes.data.summary);
+      } catch (error) {
+        toast.error(error?.response?.data?.message || error.message);
+      }
+    };
+
+    loadData();
   }, []);
 
-  // Filter employees by search + department
+  // ✅ Filter employees by search
   useEffect(() => {
-    let temp = employees;
+    let temp = [...employees];
 
     if (search.trim()) {
+      const query = search.toLowerCase();
       temp = temp.filter(
         (emp) =>
-          emp.firstName.toLowerCase().includes(search.toLowerCase()) ||
-          emp.lastName.toLowerCase().includes(search.toLowerCase()) ||
-          emp.email.toLowerCase().includes(search.toLowerCase())
+          emp.employeeId.firstName?.toLowerCase().includes(query) ||
+          emp.employeeId.lastName?.toLowerCase().includes(query) ||
+          emp.employeeId.email?.toLowerCase().includes(query)
       );
     }
 
-    if (department) {
-      temp = temp.filter((emp) => emp.department === department);
-    }
-
     setFilteredEmployees(temp);
-  }, [search, department, employees]);
+  }, [search, employees]);
 
-  // Get unique departments
-  const departments = [...new Set(employees.map((e) => e.department))];
-
-  // Update attendance
+  // ✅ Save updated attendance
   const handleSave = async (empId, status) => {
     try {
-      const res = await axios.put(`/api/attendance/admin/${empId}`, {
-        status:status.toLowerCase(),
+      const res = await axios.put(`/api/attendance/${empId}`, {
+        status: status.toLowerCase(),
       });
-      if (res?.data?.success) {
+
+      if (res.data.success) {
         toast.success("Attendance updated!");
         setEmployees((prev) =>
           prev.map((e) => (e._id === empId ? { ...e, status } : e))
         );
       }
     } catch (error) {
-      toast.error(error?.response?.data?.message || error?.message);
+      toast.error(error?.response?.data?.message || error.message);
     }
-  };
-
-  const handleView = (emp) => {
-    alert(
-      `Employee: ${emp.firstName} ${emp.lastName}\nEmail: ${emp.email}\nDepartment: ${emp.department}\nStatus: ${emp.status}`
-    );
   };
 
   return (
     <div className="p-6">
-      {/* Stats */}
-      <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-        <li className="p-6 bg-blue-100 rounded-xl shadow flex flex-col items-center justify-center">
-          <TbGraph className="text-blue-600 text-3xl mb-2" />
-          <p className="text-lg font-semibold text-blue-700">{records.total}</p>
-          <p className="text-sm text-gray-600">Total Employees</p>
-        </li>
-
-        <li className="p-6 bg-green-100 rounded-xl shadow flex flex-col items-center justify-center">
-          <FaUserCheck className="text-green-600 text-3xl mb-2" />
-          <p className="text-lg font-semibold text-green-700">
-            {records.present}
-          </p>
-          <p className="text-sm text-gray-600">Present</p>
-        </li>
-
-        <li className="p-6 bg-yellow-100 rounded-xl shadow flex flex-col items-center justify-center">
-          <FaUserClock className="text-yellow-600 text-3xl mb-2" />
-          <p className="text-lg font-semibold text-yellow-700">{records.late}</p>
-          <p className="text-sm text-gray-600">Late</p>
-        </li>
-
-        <li className="p-6 bg-red-100 rounded-xl shadow flex flex-col items-center justify-center">
-          <FaUserTimes className="text-red-600 text-3xl mb-2" />
-          <p className="text-lg font-semibold text-red-700">
-            {records.absent}
-          </p>
-          <p className="text-sm text-gray-600">Absent</p>
-        </li>
+      {/* ✅ Stats Section */}
+      <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard
+          icon={FaUserCheck}
+          color={{ bg: "bg-green-100", icon: "text-green-600", text: "text-green-700" }}
+          label="Present"
+          value={records.present}
+        />
+        <StatCard
+          icon={FaUserClock}
+          color={{ bg: "bg-yellow-100", icon: "text-yellow-600", text: "text-yellow-700" }}
+          label="Late"
+          value={records.late}
+        />
+        <StatCard
+          icon={FaUserTimes}
+          color={{ bg: "bg-yellow-50", icon: "text-yellow-400", text: "text-yellow-400" }}
+          label="Half-day"
+          value={records?.["half-day"]}
+        />
+        <StatCard
+          icon={FaUserTimes}
+          color={{ bg: "bg-red-100", icon: "text-red-600", text: "text-red-700" }}
+          label="Absent"
+          value={records.absent}
+        />
       </ul>
 
-      {/* Filters */}
+      {/* ✅ Filters */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <input
           type="text"
@@ -132,22 +136,9 @@ function Attendance() {
           onChange={(e) => setSearch(e.target.value)}
           className="p-2 border rounded-md w-full sm:w-1/2"
         />
-
-        <select
-          value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          className="p-2 border rounded-md w-full sm:w-1/4"
-        >
-          <option value="">All Departments</option>
-          {departments.map((dept) => (
-            <option key={dept} value={dept}>
-              {dept}
-            </option>
-          ))}
-        </select>
       </div>
 
-      {/* Employees Table */}
+      {/* ✅ Employees Table */}
       <div className="overflow-x-auto">
         <table className="min-w-full border rounded-lg shadow bg-white">
           <thead>
@@ -169,24 +160,22 @@ function Attendance() {
                   <td className="p-3 border">{emp.employeeId.email}</td>
                   <td className="p-3 border">{emp.employeeId.department}</td>
                   <td className="p-3 border">
-                    <span className={`px-3 ${emp.status == "present" ? "text-green-400" : `${emp.status=="late" || "leave" || "half-day" ? "text-amber-400" : "text-red-500"}`}`}>{emp.status}</span>
-
                     <select
                       value={emp.status}
                       onChange={(e) =>
                         setEmployees((prev) =>
                           prev.map((el) =>
-                            el._id === emp._id
-                              ? { ...el, status: e.target.value }
-                              : el
+                            el._id === emp._id ? { ...el, status: e.target.value } : el
                           )
                         )
                       }
                       className="p-1 border rounded"
                     >
-                      <option value="Present">Present</option>
-                      <option value="Absent">Absent</option>
-                      <option value={"leave"}>Leave</option>
+                      <option value="present">Present</option>
+                      <option value="absent">Absent</option>
+                      <option value="late">Late</option>
+                      <option value="leave">Leave</option>
+                      <option value="half-day">Half-Day</option>
                     </select>
                   </td>
                   <td className="p-3 border flex gap-2">
@@ -197,7 +186,9 @@ function Attendance() {
                       Save
                     </button>
                     <button
-                      onClick={() => handleView(emp)}
+                      onClick={() =>
+                        navigate(`/hr/attendance/${emp.employeeId._id}`)
+                      }
                       className="px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
                     >
                       View

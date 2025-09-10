@@ -17,14 +17,13 @@ import { UserInfoContext } from "../context/contextApi";
 
 const Sidebar = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const {user} = useContext(UserInfoContext)
+  const { user } = useContext(UserInfoContext);
   const [role, setRole] = useState(null);
   const location = useLocation();
 
-useEffect(()=>{
-    setRole(user?.role)
-})
-  
+  useEffect(() => {
+    setRole(user?.role);
+  }, [user]);
 
   // Menus for different roles
   const menus = {
@@ -41,7 +40,8 @@ useEffect(()=>{
       { name: "Dashboard", icon: Home, link: "/hr/dashboard" },
       { name: "Attendance", icon: Calendar, link: "/hr/attendance" },
       { name: "Leave Requests", icon: ClipboardList, link: "/hr/leave-requests" },
-        { name: "Employee Approvals", icon: Calendar, link: "/hr/employee-approval" },
+      { name: "Employee Approvals", icon: Calendar, link: "/hr/employee-approval" },
+      { name: "Tasks", icon: FileText, link: "/hr/tasks" },
       { name: "Reports", icon: BarChart2, link: "/hr/reports" },
       { name: "Logout", icon: LogOut, link: "/logout" },
     ],
@@ -82,7 +82,11 @@ useEffect(()=>{
         <ul className="space-y-1 p-4">
           {currentMenu.map((item, index) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.link;
+            // ✅ Fix: highlight if current path starts with link (handles /attendance/:empId too)
+            const isActive =
+              location.pathname === item.link ||
+              location.pathname.startsWith(item.link + "/");
+
             return (
               <li key={index}>
                 <Link
@@ -103,7 +107,7 @@ useEffect(()=>{
           })}
         </ul>
       </aside>
-      </>
+    </>
   );
 };
 
